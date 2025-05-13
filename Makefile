@@ -1,12 +1,13 @@
 CC = gcc
-CFLAGS = -LPDCurses -lpdcurses $(shell pkg-config --libs ncurses 2>/dev/null || echo "-lcurses")
+CFLAGS = -Wall -Wextra
+LDFLAGS = -LPDCurses $(shell pkg-config --libs ncurses 2>/dev/null || echo "-lcurses") -lcjson
 TARGET = wizard
 
 wizard: wizard.c
-	$(CC) wizard.c -o wizard $(CFLAGS $(LDFLAGS))
+	$(CC) $(CFLAGS) wizard.c -o $(TARGET) $(LDFLAGS)
 
 run: wizard
-	./wizard
+	./$(TARGET)
 
 clean:
-	rm -f wizard
+	rm -f $(TARGET)
