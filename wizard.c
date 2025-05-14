@@ -28,42 +28,64 @@ int create_directory(const char* path) {
 	#endif
 }
 
-void create_structure(cJSON *node, const char *base_path) {
-	if (node == NULL) {
-		mvprintw(0, 0, "Error: JSON node is NULL");
+void create_file(const char *path) {
+	FILE *file = fopen(path, "w");
+	if (file == NULL) {
+		mvprintw(0, 0, "Error: Could not create file %s", path);
 		refresh();
-		return;
 	}
-
-	if (cJSON_IsObject(node)) {
-		cJSON *child = node->child;
-		while (child != NULL) {
-			char new_path[1024];
-			snprintf(new_path, sizeof(new_path), "%s/%s", base_path, child->string);
-			
-			if (create_directory(new_path) != 0) {
-				mvprintw(0, 0, "Failed to create directory: %s", new_path);
-				refresh();
-			} 
-			else {
-				mvprintw(0, 0, "Created directory: %s", new_path);
-				refresh();
-			}
-
-			create_structure(child, new_path);
-			child = child->next;
-		}
+	else {
+		refresh();
+		fclose(file);
 	}
-	else if (cJSON_IsArray(node)) {
-		int array_size = cJSON_GetArraySize(node);
+}
 
-		if (array_size > 0 && cJSON_IsObject(cJSON_GetArrayItem(node, 0))) {
-			for (int i = 0; i < array_size; i++) {
-				cJSON *array_item = cJSON_GetArrayItem(node, i);
-				create_structure(array_item, base_path);
-			}
-		}
-	}
+void create_structure(cJSON *node, const char *base_path) {
+    if (node == NULL) {
+        mvprintw(0, 0, "Error: JSON node is NULL");
+        refresh();
+        return;
+    }
+
+    if (cJSON_IsObject(node)) {
+        cJSON *child = node->child;
+        while (child != NULL) {
+            if (strcmp(child->string, "class") == 0) {
+                child = child->next;
+                continue;
+            }
+
+            cJSON *class_item = cJSON_GetObjectItem(child, "class");
+            const char *node_class = (class_item && cJSON_IsString(class_item)) ? class_item->valuestring : NULL;
+
+            char new_path[1024];
+            snprintf(new_path, sizeof(new_path), "%s/%s", base_path, child->string);
+
+            if (node_class) {
+                if (strcmp(node_class, "file") == 0) {
+                    create_file(new_path);
+                    mvprintw(0, 2, "Created file: %s", new_path);
+                    refresh();
+                } else if (strcmp(node_class, "folder") == 0) {
+                    if (create_directory(new_path) != 0) {
+                        mvprintw(0, 1, "Failed to create directory: %s", new_path);
+                        refresh();
+                    } else {
+                        mvprintw(0, 2, "Created directory: %s", new_path);
+                        refresh();
+                    }
+                    create_structure(child, new_path);
+                }
+            }
+            child = child->next;
+        }
+    } else if (cJSON_IsArray(node)) {
+        int array_size = cJSON_GetArraySize(node);
+        for (int i = 0; i < array_size; i++) {
+            cJSON *array_item = cJSON_GetArrayItem(node, i);
+            create_structure(array_item, base_path);
+        }
+    }
 }
 
 char* read_file() {
@@ -122,6 +144,5 @@ int main() {
 	refresh();
 	getch();
 	endwin();
-	free(read_file());
 	return 0;
 }

@@ -1,14 +1,23 @@
 {
-    "test": {
-        "Datas": [
-            {
-                "Logs":[],
-                "Pics":[
-                    {
-                        "tooth_diagrams":[]
-                    }
-                ]
+    "test":{
+        "class": "folder",
+        "Datas":{
+            "class": "folder",
+            "cache": {
+                "class": "folder"
+            },
+            "test.txt": {
+                "class": "file"
             }
-        ]
+        },
+        "Logs":{
+            "class": "folder"
+        },
+        "Pics":{
+            "class": "folder",
+            "tooth_diagrams": {
+                "class": "folder"
+            }
+        }
     }
 }
