@@ -40,6 +40,10 @@ void create_file(const char *path) {
 	}
 }
 
+void write_csv(const char *path, const char *headers) {
+	printf("check %s %s", path, headers);
+}
+
 void create_structure(cJSON *node, const char *base_path) {
     if (node == NULL) {
         mvprintw(0, 0, "Error: JSON node is NULL");
@@ -49,11 +53,25 @@ void create_structure(cJSON *node, const char *base_path) {
 
     if (cJSON_IsObject(node)) {
         cJSON *child = node->child;
+		const char *file_name = NULL;
         while (child != NULL) {
             if (strcmp(child->string, "class") == 0) {
-                child = child->next;
+                if (child->next != NULL) {
+					file_name = child->next->string;
+				}
+				child = child->next;
                 continue;
             }
+
+			cJSON *type_item = cJSON_GetObjectItem(child, "type");
+			const char *node_type = (type_item && cJSON_IsString(type_item)) ? type_item->valuestring : NULL;
+			if (node_type && strcmp(node_type, "csv") == 0) {
+				cJSON *headers = cJSON_GetObjectItem(child, "headers");
+        		const char *headers_str = (headers && cJSON_IsString(headers)) ? headers->valuestring : NULL;
+				char file_path[1024];
+				snprintf(file_path, sizeof(file_path), "%s/%s", base_path, file_name);
+        		write_csv(file_path, headers_str);
+			}
 
             cJSON *class_item = cJSON_GetObjectItem(child, "class");
             const char *node_class = (class_item && cJSON_IsString(class_item)) ? class_item->valuestring : NULL;

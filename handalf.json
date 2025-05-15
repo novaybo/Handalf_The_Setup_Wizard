@@ -4,9 +4,38 @@
         "Datas":{
             "class": "folder",
             "cache": {
-                "class": "folder"
+                "class": "folder",
+                "Prices.csv": {
+                    "class": "file",
+                    "type": "csv",
+                    "headers": "test"
+                }
             },
-            "test.txt": {
+            "Accounting_Data.json": {
+                "class": "file"
+            },
+            "config.json": {
+                "class": "file"
+            },
+            "credential.dat": {
+                "class": "file"
+            },
+            "Expenses.csv": {
+                "class": "file"
+            },
+            "Informal_Expenses.csv": {
+                "class": "file"
+            },
+            "Operation_Datas.json": {
+                "class": "file"
+            },
+            "Operation_ID.txt": {
+                "class": "file"
+            },
+            "Patient_Datas.csv": {
+                "class": "file"
+            },
+            "Planning_Datas.json": {
                 "class": "file"
             }
         },
