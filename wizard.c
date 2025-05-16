@@ -5,6 +5,18 @@
 #include <sys/stat.h>
 #include <string.h>
 
+#define STATUS_HEIGHT 10
+#define STATUS_WIDTH 70
+#define INFO_HEIGHT 5
+#define INFO_WIDTH 70
+#define MAX_STATUS_LINES (STATUS_HEIGHT -2)
+#define MAX_STATUS_MSG_LEN 256
+
+char status_msgs[MAX_STATUS_LINES][MAX_STATUS_MSG_LEN];
+int status_msg_count = 0;
+int status_msg_start = 0;
+
+WINDOW *status_win, *info_win;
 
 
 void init_ui(){
@@ -16,7 +28,67 @@ void init_ui(){
 	init_pair(1, COLOR_GREEN, COLOR_BLACK);
 	init_pair(2, COLOR_YELLOW, COLOR_BLACK);
 	init_pair(3, COLOR_RED, COLOR_BLACK);
+	refresh();
 }
+
+void welcome_page() {
+	clear();
+	attron(A_BOLD | COLOR_PAIR(1));
+	mvprintw(2, 10, "Handalf The Setup Wizard");
+	attroff(A_BOLD | COLOR_PAIR(1));
+	mvprintw(4, 10, "This wizard will set up your project structue as defined in handalf.json");
+	mvprintw(6, 10, "Press any key to start -> -> ->");
+	refresh();
+	getch();
+}
+
+void create_windows() {
+	int starty = 2, startx = 5;
+	status_win = newwin(STATUS_HEIGHT, STATUS_WIDTH, starty, startx);
+	box(status_win, 0, 0);
+	mvwprintw(status_win, 0, 2, " Progress ");
+	wrefresh(status_win);
+
+	info_win = newwin(INFO_HEIGHT, INFO_WIDTH, starty + STATUS_HEIGHT + 1, startx);
+	box(info_win, 0, 0);
+	mvwprintw(info_win, 0, 2, " Info ");
+	wrefresh(info_win);
+}
+
+void update_status(const char *msg, int color_pair) {
+	int idx = (status_msg_start + status_msg_count) % MAX_STATUS_LINES;
+    snprintf(status_msgs[idx], MAX_STATUS_MSG_LEN, "%s", msg);
+
+    if (status_msg_count < MAX_STATUS_LINES) {
+        status_msg_count++;
+    } else {
+        status_msg_start = (status_msg_start + 1) % MAX_STATUS_LINES;
+    }
+
+    werase(status_win);
+    box(status_win, 0, 0);
+    mvwprintw(status_win, 0, 2, " Progress ");
+
+    for (int i = 0; i < status_msg_count; ++i) {
+        int msg_idx = (status_msg_start + i) % MAX_STATUS_LINES;
+        wattron(status_win, COLOR_PAIR(color_pair));
+        mvwprintw(status_win, i + 1, 2, "%s", status_msgs[msg_idx]);
+        wattroff(status_win, COLOR_PAIR(color_pair));
+    }
+    wrefresh(status_win);
+}
+
+void show_info(const char *msg, int color_pair) {
+	werase(info_win);
+	box(info_win, 0, 0);
+	mvwprintw(info_win, 0, 2, " Info ");
+	wattron(info_win, COLOR_PAIR(color_pair));
+	mvwprintw(info_win, 2, 2, "%s", msg);
+	wattroff(info_win, COLOR_PAIR(color_pair));
+	wrefresh(info_win);
+}
+
+
 
 int create_directory(const char* path) {
 	#ifdef _WIN32
@@ -31,11 +103,11 @@ int create_directory(const char* path) {
 void create_file(const char *path) {
 	FILE *file = fopen(path, "w");
 	if (file == NULL) {
-		mvprintw(0, 0, "Error: Could not create file %s", path);
-		refresh();
+		char buf[256];
+		snprintf(buf, sizeof(buf), "Error: Could not create file %s", path);
+		update_status(buf, 3);
 	}
 	else {
-		refresh();
 		fclose(file);
 	}
 }
@@ -46,14 +118,17 @@ void write_csv(const char *path, const char *headers) {
 		fprintf(file, "%s\n", headers);
 		fclose(file);
 	}
-	else mvprintw(0, 0, "Failed to write headers %s", path);
+	else {
+		char buf[256];
+		snprintf(buf, sizeof(buf), "Failed to write headers %s", path);
+		update_status(buf, 3);
+	}
 }
 
 void create_structure(cJSON *node, const char *base_path) {
     if (node == NULL) {
-        mvprintw(0, 0, "Error: JSON node is NULL");
-        refresh();
-        return;
+		update_status("Error: JSON node is NULL", 3);
+		return;
     }
 
     if (cJSON_IsObject(node)) {
@@ -78,16 +153,20 @@ void create_structure(cJSON *node, const char *base_path) {
             if (node_class) {
                 if (strcmp(node_class, "file") == 0) {
                     create_file(new_path);
-                    mvprintw(0, 2, "Created file: %s", new_path);
-                    refresh();
+					char buf[256];
+					snprintf(buf, sizeof(buf), "Created file %s", new_path);
+					update_status(buf, 1);
                 } else if (strcmp(node_class, "folder") == 0) {
-                    if (create_directory(new_path) != 0) {
-                        mvprintw(0, 1, "Failed to create directory: %s", new_path);
-                        refresh();
-                    } else {
-                        mvprintw(0, 2, "Created directory: %s", new_path);
-                        refresh();
-                    }
+                    if (create_directory(new_path) != 0 && create_directory(new_path) != -1) {
+						char buf[256];
+						snprintf(buf, sizeof(buf), "Failed to create directory: %s", new_path);
+						update_status(buf, 3);
+					}
+					else {
+						char buf[256];
+						snprintf(buf, sizeof(buf), "Created directory %s", new_path);
+						update_status(buf, 1);
+					}
                     create_structure(child, new_path);
                 }
             }
@@ -100,6 +179,9 @@ void create_structure(cJSON *node, const char *base_path) {
 				file_name = child->string;
 				snprintf(file_path, sizeof(file_path), "%s/%s", base_path, file_name);
         		write_csv(file_path, headers_str);
+				char buf[256];
+				snprintf(buf, sizeof(buf), "Created CSV: %s", file_path);
+				update_status(buf, 2);
 			}
             child = child->next;
         }
@@ -116,8 +198,7 @@ char* read_file() {
 	const char* filename = "handalf.json";
 	FILE* file = fopen(filename, "r");
 	if (file == NULL) {
-		mvprintw(0, 0, "Error: Could not open handalf.json in current directory");
-		refresh();
+		show_info("Error: Could not open handalf.json in current directory", 3);
 		return NULL;
 	}
 
@@ -128,8 +209,7 @@ char* read_file() {
 	char* buffer = (char*)malloc(length + 1);
 	if (buffer == NULL) {
 		fclose(file);
-		mvprintw(0, 0, "Error: Memory allocation failed");
-		refresh();
+		show_info("Error: Memory allocation failed", 3);
 		return NULL;
 	}
 
@@ -140,8 +220,7 @@ char* read_file() {
 	
 	char *file_content = buffer;
 	if (file_content == NULL) {
-		mvprintw(0, 0, "Error: Failed to read file content");
-		refresh();
+		show_info("Error: Failed to read file content", 3);
 		return NULL;
 	}
 
@@ -149,8 +228,7 @@ char* read_file() {
 	free(file_content);
 
 	if (json == NULL) {
-		mvprintw(0, 0, "Error: Failed to parse handalf.json");
-		refresh();
+		show_info("Error: Failed to parse handalf.json", 3);
 		return NULL;
 	}
 
@@ -164,9 +242,19 @@ char* read_file() {
 int main() {
 
 	init_ui();
-	mvprintw(0, 0, read_file());
-	refresh();
+	welcome_page();
+	create_windows();
+	show_info("Setting up project structure...", 2);
+	char *json_str = read_file();
+	if (json_str) {
+		show_info("Setup complete! Press any key to exit.", 1);
+		free(json_str);
+	} else {
+		show_info("Setup failed. Press any key to exit.", 3);
+	}
 	getch();
+	delwin(status_win);
+	delwin(info_win);
 	endwin();
 	return 0;
 }
