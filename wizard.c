@@ -41,7 +41,12 @@ void create_file(const char *path) {
 }
 
 void write_csv(const char *path, const char *headers) {
-	printf("check %s %s", path, headers);
+	FILE *file = fopen(path, "w");
+	if (file != NULL) {
+		fprintf(file, "%s\n", headers);
+		fclose(file);
+	}
+	else mvprintw(0, 0, "Failed to write headers %s", path);
 }
 
 void create_structure(cJSON *node, const char *base_path) {
@@ -56,25 +61,13 @@ void create_structure(cJSON *node, const char *base_path) {
 		char *file_name = NULL;
 		char file_path[1024];
 		char *headers_str = NULL;
-		char *is_cvs = NULL;
         while (child != NULL) {
-			is_cvs = "0";
             if (strcmp(child->string, "class") == 0) {
-                if (child->next != NULL) {
-					file_name = child->next->string;
-				}
 				child = child->next;
                 continue;
             }
 
-			cJSON *type_item = cJSON_GetObjectItem(child, "type");
-			const char *node_type = (type_item && cJSON_IsString(type_item)) ? type_item->valuestring : NULL;
-			if (node_type && strcmp(node_type, "csv") == 0) {
-				cJSON *headers = cJSON_GetObjectItem(child, "headers");
-        		headers_str = (headers && cJSON_IsString(headers)) ? headers->valuestring : NULL;
-				snprintf(file_path, sizeof(file_path), "%s/%s", base_path, file_name);
-        		is_cvs = "1";
-			}
+			
 
             cJSON *class_item = cJSON_GetObjectItem(child, "class");
             const char *node_class = (class_item && cJSON_IsString(class_item)) ? class_item->valuestring : NULL;
@@ -86,9 +79,6 @@ void create_structure(cJSON *node, const char *base_path) {
                 if (strcmp(node_class, "file") == 0) {
                     create_file(new_path);
                     mvprintw(0, 2, "Created file: %s", new_path);
-					if (strcmp(is_cvs, "1") == 0) {
-						write_csv(file_path, headers_str);
-					}
                     refresh();
                 } else if (strcmp(node_class, "folder") == 0) {
                     if (create_directory(new_path) != 0) {
@@ -101,6 +91,16 @@ void create_structure(cJSON *node, const char *base_path) {
                     create_structure(child, new_path);
                 }
             }
+			
+			cJSON *type_item = cJSON_GetObjectItem(child, "type");
+			const char *node_type = (type_item && cJSON_IsString(type_item)) ? type_item->valuestring : NULL;
+			if (node_type && strcmp(node_type, "csv") == 0) {
+				cJSON *headers = cJSON_GetObjectItem(child, "headers");
+        		headers_str = (headers && cJSON_IsString(headers)) ? headers->valuestring : NULL;
+				file_name = child->string;
+				snprintf(file_path, sizeof(file_path), "%s/%s", base_path, file_name);
+        		write_csv(file_path, headers_str);
+			}
             child = child->next;
         }
     } else if (cJSON_IsArray(node)) {

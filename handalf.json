@@ -8,7 +8,7 @@
                 "Prices.csv": {
                     "class": "file",
                     "type": "csv",
-                    "headers": "test"
+                    "headers": "header"
                 }
             },
             "Accounting_Data.json": {
@@ -21,10 +21,14 @@
                 "class": "file"
             },
             "Expenses.csv": {
-                "class": "file"
+                "class": "file",
+                "type": "csv",
+                "headers": "header"
             },
             "Informal_Expenses.csv": {
-                "class": "file"
+                "class": "file",
+                "type": "csv",
+                "headers": "header"
             },
             "Operation_Datas.json": {
                 "class": "file"
@@ -33,7 +37,9 @@
                 "class": "file"
             },
             "Patient_Datas.csv": {
-                "class": "file"
+                "class": "file",
+                "type": "csv",
+                "headers": "header"
             },
             "Planning_Datas.json": {
                 "class": "file"
