@@ -4,6 +4,7 @@
 #include <cjson/cJSON.h>
 #include <sys/stat.h>
 #include <string.h>
+#include <ncurses.h>
 
 #define STATUS_HEIGHT 10
 #define STATUS_WIDTH 70
@@ -18,6 +19,15 @@ int status_msg_start = 0;
 
 WINDOW *status_win, *info_win;
 
+#define PROGRESS_HEIGHT 3
+#define PROGRESS_WIDTH 70
+
+int total_items = 0;
+int items_done = 0;
+
+WINDOW *progress_win;
+
+
 
 void init_ui(){
 	initscr();
@@ -26,7 +36,7 @@ void init_ui(){
 	keypad(stdscr, TRUE);
 	start_color();
 	init_pair(1, COLOR_GREEN, COLOR_BLACK);
-	init_pair(2, COLOR_YELLOW, COLOR_BLACK);
+	init_pair(2, COLOR_BLUE, COLOR_BLACK);
 	init_pair(3, COLOR_RED, COLOR_BLACK);
 	refresh();
 }
@@ -39,13 +49,24 @@ void welcome_page() {
 	mvprintw(4, 10, "This wizard will set up your project structue as defined in handalf.json");
 	mvprintw(6, 10, "Press any key to start -> -> ->");
 	refresh();
-	getch();
+	int input;
+
+	while (1) {
+		input = getch();
+		if (input == 27) {
+			endwin();
+			exit(0);
+		} else if (input == '\n' || input == KEY_ENTER || input == 10 || input == 13) {
+			break;
+		}
+	}
+	clear();
+	refresh();
 }
 
 void create_windows() {
 	int starty = 2, startx = 5;
 	status_win = newwin(STATUS_HEIGHT, STATUS_WIDTH, starty, startx);
-	box(status_win, 0, 0);
 	mvwprintw(status_win, 0, 2, " Progress ");
 	wrefresh(status_win);
 
@@ -66,8 +87,10 @@ void update_status(const char *msg, int color_pair) {
     }
 
     werase(status_win);
+	wattron(status_win, COLOR_PAIR(2));
     box(status_win, 0, 0);
     mvwprintw(status_win, 0, 2, " Progress ");
+	wattroff(status_win, COLOR_PAIR(2));
 
     for (int i = 0; i < status_msg_count; ++i) {
         int msg_idx = (status_msg_start + i) % MAX_STATUS_LINES;
@@ -80,8 +103,10 @@ void update_status(const char *msg, int color_pair) {
 
 void show_info(const char *msg, int color_pair) {
 	werase(info_win);
+	wattron(info_win, COLOR_PAIR(2));
 	box(info_win, 0, 0);
 	mvwprintw(info_win, 0, 2, " Info ");
+	wattroff(info_win, COLOR_PAIR(2));
 	wattron(info_win, COLOR_PAIR(color_pair));
 	mvwprintw(info_win, 2, 2, "%s", msg);
 	wattroff(info_win, COLOR_PAIR(color_pair));
@@ -124,6 +149,32 @@ void write_csv(const char *path, const char *headers) {
 		update_status(buf, 3);
 	}
 }
+void update_progress_bar(int done, int total) {
+	float percent = (total > 0) ? ((float)done / total) : 0;
+	int bar_width = PROGRESS_WIDTH - 4;
+	int filled = (int)(percent * (bar_width));
+
+	werase(progress_win);
+	wattron(progress_win, COLOR_PAIR(2));
+	box(progress_win, 0, 0);
+	mvwprintw(progress_win, 0, 2, " Progress Bar ");
+	wattroff(progress_win, COLOR_PAIR(2));
+
+	wattron(progress_win, COLOR_PAIR(1));
+	mvwprintw(progress_win, 1, 2, "[");
+	for (int i = 0; i < bar_width - 1; ++i) {
+		if (i < filled)
+			waddch(progress_win, '=');
+		else
+			waddch(progress_win, ' ');
+	}
+	mvwaddch(progress_win, 1, 2 + bar_width - 1, ']');
+	wattroff(progress_win, COLOR_PAIR(1));
+	wattron(progress_win, COLOR_PAIR(2));
+	mvwprintw(progress_win, 2, 2, " %d%% ", (int)(percent * 100));
+	wattroff(progress_win, COLOR_PAIR(2));
+	wrefresh(progress_win);
+}
 
 void create_structure(cJSON *node, const char *base_path) {
     if (node == NULL) {
@@ -156,6 +207,8 @@ void create_structure(cJSON *node, const char *base_path) {
 					char buf[256];
 					snprintf(buf, sizeof(buf), "Created file %s", new_path);
 					update_status(buf, 1);
+					items_done++;
+					update_progress_bar(items_done, total_items);
                 } else if (strcmp(node_class, "folder") == 0) {
                     if (create_directory(new_path) != 0 && create_directory(new_path) != -1) {
 						char buf[256];
@@ -166,6 +219,8 @@ void create_structure(cJSON *node, const char *base_path) {
 						char buf[256];
 						snprintf(buf, sizeof(buf), "Created directory %s", new_path);
 						update_status(buf, 1);
+						items_done++;
+						update_progress_bar(items_done, total_items);
 					}
                     create_structure(child, new_path);
                 }
@@ -192,6 +247,30 @@ void create_structure(cJSON *node, const char *base_path) {
             create_structure(array_item, base_path);
         }
     }
+}
+
+int count_items(cJSON *node) {
+	int count = 0;
+	if (node == NULL) return 0;
+	if (cJSON_IsObject(node)) {
+		cJSON *child = node->child;
+		while (child != NULL) {
+			cJSON *class_item = cJSON_GetObjectItem(child, "class");
+			const char *node_class = (class_item && cJSON_IsString(class_item)) ? class_item->valuestring : NULL;
+			if (node_class && (strcmp(node_class, "file") == 0 || strcmp(node_class, "folder") == 0)) {
+				count++;
+			}
+			count += count_items(child);
+			child = child->next;
+		}
+	}else if (cJSON_IsArray(node)) {
+		int array_size = cJSON_GetArraySize(node);
+		for (int i = 0; i < array_size; i++) {
+			cJSON *array_item = cJSON_GetArrayItem(node, i);
+			count += count_items(array_item);
+		}
+	}
+	return count;
 }
 
 char* read_file() {
@@ -232,6 +311,8 @@ char* read_file() {
 		return NULL;
 	}
 
+	total_items = count_items(json);
+	items_done = 0;
 	create_structure(json, ".");
 
 	char* json_string = cJSON_Print(json);
@@ -239,10 +320,22 @@ char* read_file() {
 	return json_string;
 }
 
+void init_progrss_bar() {
+	int starty = 2;
+	int startx = STATUS_WIDTH + 15;
+	progress_win = newwin(PROGRESS_HEIGHT, PROGRESS_WIDTH, starty, startx);
+	wattron(progress_win, COLOR_PAIR(2));
+	box(progress_win, 0, 0);
+	mvwprintw(progress_win, 0, 2, " Progress Bar ");
+	wattroff(progress_win, COLOR_PAIR(2));
+	wrefresh(progress_win);
+}
+
 int main() {
 
 	init_ui();
 	welcome_page();
+	init_progrss_bar();
 	create_windows();
 	show_info("Setting up project structure...", 2);
 	char *json_str = read_file();
@@ -255,6 +348,7 @@ int main() {
 	getch();
 	delwin(status_win);
 	delwin(info_win);
+	delwin(progress_win);
 	endwin();
 	return 0;
 }
