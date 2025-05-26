@@ -5,6 +5,8 @@
 #include <sys/stat.h>
 #include <string.h>
 #include <ncurses.h>
+#include <errno.h>
+#include <unistd.h>
 
 #define STATUS_HEIGHT 10
 #define STATUS_WIDTH 70
@@ -129,7 +131,7 @@ void create_file(const char *path) {
 	FILE *file = fopen(path, "w");
 	if (file == NULL) {
 		char buf[256];
-		snprintf(buf, sizeof(buf), "Error: Could not create file %s", path);
+		snprintf(buf, sizeof(buf), "Error: Could not create file %.200s", path);
 		update_status(buf, 3);
 	}
 	else {
@@ -205,19 +207,19 @@ void create_structure(cJSON *node, const char *base_path) {
                 if (strcmp(node_class, "file") == 0) {
                     create_file(new_path);
 					char buf[256];
-					snprintf(buf, sizeof(buf), "Created file %s", new_path);
+					snprintf(buf, sizeof(buf), "Created file %.200s", new_path);
 					update_status(buf, 1);
 					items_done++;
 					update_progress_bar(items_done, total_items);
                 } else if (strcmp(node_class, "folder") == 0) {
                     if (create_directory(new_path) != 0 && create_directory(new_path) != -1) {
 						char buf[256];
-						snprintf(buf, sizeof(buf), "Failed to create directory: %s", new_path);
+						snprintf(buf, sizeof(buf), "Failed to create directory: %.200s", new_path);
 						update_status(buf, 3);
 					}
 					else {
 						char buf[256];
-						snprintf(buf, sizeof(buf), "Created directory %s", new_path);
+						snprintf(buf, sizeof(buf), "Created directory %.200s", new_path);
 						update_status(buf, 1);
 						items_done++;
 						update_progress_bar(items_done, total_items);
@@ -235,7 +237,7 @@ void create_structure(cJSON *node, const char *base_path) {
 				snprintf(file_path, sizeof(file_path), "%s/%s", base_path, file_name);
         		write_csv(file_path, headers_str);
 				char buf[256];
-				snprintf(buf, sizeof(buf), "Created CSV: %s", file_path);
+				snprintf(buf, sizeof(buf), "Created CSV: %.200s", file_path);
 				update_status(buf, 2);
 			}
             child = child->next;
@@ -269,6 +271,70 @@ int count_items(cJSON *node) {
 			cJSON *array_item = cJSON_GetArrayItem(node, i);
 			count += count_items(array_item);
 		}
+	}
+	return count;
+}
+
+int move_item(const char *src, const char *dst) {
+	char cmd[1024];
+    snprintf(cmd, sizeof(cmd), "mv \"%s\" \"%s\"", src, dst);
+    int result = system(cmd);
+
+    if (result == 0) {
+        char buf[256];
+        snprintf(buf, sizeof(buf), "Moved %s to %s (using system mv)", src, dst);
+        update_status(buf, 1);
+        return 0;
+    } else {
+        char buf[256];
+        snprintf(buf, sizeof(buf), "Error: Could not move from %s to %s (using system mv, result=%d)", src, dst, result);
+        update_status(buf, 3);
+        return -1;
+    }
+}
+
+void process_moves(cJSON *move_section) {
+	if (move_section == NULL || !cJSON_IsObject(move_section)) {
+		update_status("Error: Move section is NULL or not an object", 3);
+		return;
+	}
+
+	cJSON *move_entry = move_section->child;
+	while(move_entry) {
+		cJSON *class_item = cJSON_GetObjectItem(move_entry, "class");
+		const char *node_class = (class_item && cJSON_IsString(class_item)) ? class_item->valuestring : NULL;
+
+		cJSON *from_item = cJSON_GetObjectItem(move_entry, "from");
+		const char *from = (from_item && cJSON_IsString(from_item)) ? from_item->valuestring : NULL;
+
+		cJSON *move_to_item = cJSON_GetObjectItem(move_entry, "move to");
+		const char *move_to = (move_to_item && cJSON_IsString(move_to_item)) ? move_to_item->valuestring : NULL;
+
+		if (node_class && move_to && from) {
+			char src_path[1024];
+			char dst_path[1024];
+			snprintf(src_path, sizeof(src_path), "%s/%s", from, move_entry->string);
+			snprintf(dst_path, sizeof(dst_path), "%s/%s", move_to, move_entry->string);
+
+			move_item(src_path, dst_path);
+
+			items_done++;
+			update_progress_bar(items_done, total_items);
+		}
+		move_entry = move_entry->next;
+	}
+}
+
+int count_moves(cJSON *move_section) {
+	int count = 0;
+	if (!move_section || !cJSON_IsObject(move_section)) {
+		update_status("Error: Move section is NULL or not an object", 3);
+		return 0;
+	}
+	cJSON *move_entry = move_section->child;
+	while (move_entry) {
+		count++;
+		move_entry = move_entry->next;
 	}
 	return count;
 }
@@ -311,9 +377,15 @@ char* read_file() {
 		return NULL;
 	}
 
-	total_items = count_items(json);
+	cJSON *to_create = cJSON_GetObjectItem(json, "to-create");
+	cJSON *to_move = cJSON_GetObjectItem(json, "to-move");
+	
+	if (to_create) total_items += count_items(to_create);
+	if (to_move) total_items += count_moves(to_move);
 	items_done = 0;
-	create_structure(json, ".");
+
+	if (to_create) create_structure(to_create, ".");
+	if (to_move) process_moves(to_move);
 
 	char* json_string = cJSON_Print(json);
 	cJSON_Delete(json);

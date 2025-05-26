@@ -1,58 +1,67 @@
 {
-    "test":{
-        "class": "folder",
-        "Datas":{
+    "to-create":{
+        "test":{
             "class": "folder",
-            "cache": {
+            "Datas":{
                 "class": "folder",
-                "Prices.csv": {
+                "cache": {
+                    "class": "folder",
+                    "Prices.csv": {
+                        "class": "file",
+                        "type": "csv",
+                        "headers": "header"
+                    }
+                },
+                "Accounting_Data.json": {
+                    "class": "file"
+                },
+                "config.json": {
+                    "class": "file"
+                },
+                "credential.dat": {
+                    "class": "file"
+                },
+                "Expenses.csv": {
                     "class": "file",
                     "type": "csv",
                     "headers": "header"
+                },
+                "Informal_Expenses.csv": {
+                    "class": "file",
+                    "type": "csv",
+                    "headers": "header"
+                },
+                "Operation_Datas.json": {
+                    "class": "file"
+                },
+                "Operation_ID.txt": {
+                    "class": "file"
+                },
+                "Patient_Datas.csv": {
+                    "class": "file",
+                    "type": "csv",
+                    "headers": "header"
+                },
+                "Planning_Datas.json": {
+                    "class": "file"
                 }
             },
-            "Accounting_Data.json": {
-                "class": "file"
-            },
-            "config.json": {
-                "class": "file"
-            },
-            "credential.dat": {
-                "class": "file"
-            },
-            "Expenses.csv": {
-                "class": "file",
-                "type": "csv",
-                "headers": "header"
-            },
-            "Informal_Expenses.csv": {
-                "class": "file",
-                "type": "csv",
-                "headers": "header"
-            },
-            "Operation_Datas.json": {
-                "class": "file"
-            },
-            "Operation_ID.txt": {
-                "class": "file"
-            },
-            "Patient_Datas.csv": {
-                "class": "file",
-                "type": "csv",
-                "headers": "header"
-            },
-            "Planning_Datas.json": {
-                "class": "file"
-            }
-        },
-        "Logs":{
-            "class": "folder"
-        },
-        "Pics":{
-            "class": "folder",
-            "tooth_diagrams": {
+            "Logs":{
                 "class": "folder"
+            },
+            "Pics":{
+                "class": "folder",
+                "tooth_diagrams": {
+                    "class": "folder"
+                }
             }
+        }
+    },
+    "to-move":{
+        "move-test":{
+            "class": "folder",
+            "from": "./",
+            "move to": "test"
         }
     }
 }

@@ -7,7 +7,7 @@ wizard: wizard.c
 	$(CC) $(CFLAGS) wizard.c -o $(TARGET) $(LDFLAGS)
 
 run: wizard
-	./$(TARGET)
+	sudo ./$(TARGET)
 
 clean:
 	rm -f $(TARGET)
