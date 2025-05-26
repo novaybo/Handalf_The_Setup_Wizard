@@ -275,9 +275,15 @@ int count_items(cJSON *node) {
 	return count;
 }
 
+#ifdef _WIN32
+#define MV_CMD "move"
+#else
+#define MV_CMD "mv --update"
+#endif
+
 int move_item(const char *src, const char *dst) {
 	char cmd[1024];
-    snprintf(cmd, sizeof(cmd), "mv \"%s\" \"%s\"", src, dst);
+    snprintf(cmd, sizeof(cmd), "%s \"%s\" \"%s\"", MV_CMD, src, dst);
     int result = system(cmd);
 
     if (result == 0) {
